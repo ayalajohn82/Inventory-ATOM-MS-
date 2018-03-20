@@ -1,0 +1,60 @@
+service: atom-inventory
+
+custom:
+  tableName: 'products-table-${self:provider.stage}'
+
+provider:
+  name: aws
+  runtime: nodejs6.10
+  stage: dev
+  region: us-west-1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - { "Fn::GetAtt": ["ProductDynamoDBTable", "Arn" ] }
+  environment:
+    PRODUCTS_TABLE: ${self:custom.tableName}
+
+functions:
+  inventory:  
+    handler: inventory.handler
+    events:
+      - http: ANY /
+      - http: 'ANY {proxy+}'
+  getProduct:
+    handler: inventory.handler
+    events:
+      - http: 'GET /products/{proxy+}'
+  createProduct:
+    handler: inventory.handler
+    events:
+      - http: 'POST /products'
+  updateQuantity:
+    handler: inventory.handler
+    events:
+      - http: 'PATCH /products/{proxy+}'
+
+resources:
+  Resources:
+    ProductDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: productId
+            AttributeType: S
+        KeySchema:
+          -
+            AttributeName: productId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tableName}
